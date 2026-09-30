@@ -1,0 +1,489 @@
+// TraceGuard reference dataset — cold-chain telemetry, shipment records and
+// ledger anchors streamed from IoT edge nodes onto the Geth PoA consortium chain.
+
+export type TelemetryPoint = {
+  t: string; // time label
+  temp: number; // °C
+  humidity: number; // %RH
+  shock: number; // g
+  doors: number; // openings per interval
+};
+
+export type BatchStatus = "in-transit" | "at-risk" | "delivered" | "staged";
+
+export type Batch = {
+  id: string;
+  product: string;
+  origin: string;
+  destination: string;
+  quantity: string;
+  status: BatchStatus;
+  temp: number; // current temp °C
+  humidity: number; // current %RH
+  shock: number; // last event g
+  doors: number; // openings last hour
+  validator: string; // PoA validator that sealed latest block
+  block: number;
+  updated: string;
+};
+
+export type Shipment = {
+  id: string;
+  batch: string;
+  driver: string;
+  truck: string;
+  from: { x: number; y: number; label: string }; // 0-100 map coords
+  to: { x: number; y: number; label: string };
+  progress: number; // 0-100
+  status: "nominal" | "warning" | "critical" | "buffering";
+  eta: string;
+  temp: number;
+};
+
+export type LedgerTx = {
+  hash: string;
+  type: "telemetry-anchor" | "custody-transfer" | "qa-certification" | "node-register";
+  batch?: string;
+  block: number;
+  gas: string;
+  status: "confirmed" | "sealed";
+  time: string;
+  validator: string;
+};
+
+export type TimelineEvent = {
+  label: string;
+  detail: string;
+  place: string;
+  time: string;
+  txHash: string;
+  kind: "origin" | "transport" | "qa" | "handoff" | "retail";
+  icon: "farm" | "truck" | "thermometer" | "scan" | "store";
+  verified: boolean;
+};
+
+export type AlertEvent = {
+  id: string;
+  batch: string;
+  severity: "warning" | "critical";
+  message: string;
+  metric: string;
+  time: string;
+};
+
+// ── Batches ──────────────────────────────────────────────────────────────────
+
+export const batches: Batch[] = [
+  {
+    id: "TG-8492",
+    product: "Alphonso Mangoes",
+    origin: "Ratnagiri, MH",
+    destination: "FreshKart DC, Mumbai",
+    quantity: "1,240 crates",
+    status: "in-transit",
+    temp: 4.0,
+    humidity: 65,
+    shock: 0.6,
+    doors: 2,
+    validator: "validator-2.geth.poa",
+    block: 18_442_907,
+    updated: "12s ago",
+  },
+  {
+    id: "TG-8491",
+    product: "Kashmiri Apples",
+    origin: "Sopore, Kashmir",
+    destination: "Azadpur Mandi, Delhi",
+    quantity: "620 kg",
+    status: "at-risk",
+    temp: 7.8,
+    humidity: 71,
+    shock: 3.4,
+    doors: 5,
+    validator: "validator-1.geth.poa",
+    block: 18_442_905,
+    updated: "8s ago",
+  },
+  {
+    id: "TG-8487",
+    product: "Basmati Rice",
+    origin: "Karnal, Haryana",
+    destination: "Inland Container Depot, Kochi",
+    quantity: "3,150 sacks",
+    status: "in-transit",
+    temp: 21.0,
+    humidity: 44,
+    shock: 0.2,
+    doors: 1,
+    validator: "validator-3.geth.poa",
+    block: 18_442_901,
+    updated: "19s ago",
+  },
+  {
+    id: "TG-8484",
+    product: "Vaccines (2–8°C)",
+    origin: "Hyderabad, Telangana",
+    destination: "District Hospital, Vijayawada",
+    quantity: "48 cold boxes",
+    status: "in-transit",
+    temp: 5.4,
+    humidity: 48,
+    shock: 0.9,
+    doors: 0,
+    validator: "validator-2.geth.poa",
+    block: 18_442_899,
+    updated: "31s ago",
+  },
+  {
+    id: "TG-8480",
+    product: "Fresh Surmai (Kingfish)",
+    origin: "Kochi Fishing Harbour, Kerala",
+    destination: "Crawford Market, Mumbai",
+    quantity: "2,050 kg",
+    status: "at-risk",
+    temp: 6.2,
+    humidity: 78,
+    shock: 2.1,
+    doors: 4,
+    validator: "validator-1.geth.poa",
+    block: 18_442_897,
+    updated: "44s ago",
+  },
+  {
+    id: "TG-8479",
+    product: "Mishti Doi (Sweet Yogurt)",
+    origin: "Hooghly, West Bengal",
+    destination: "Gariahat Retail, Kolkata",
+    quantity: "8,900 cups",
+    status: "delivered",
+    temp: 4.0,
+    humidity: 60,
+    shock: 0.4,
+    doors: 12,
+    validator: "validator-4.geth.poa",
+    block: 18_442_812,
+    updated: "3h ago",
+  },
+  {
+    id: "TG-8477",
+    product: "Grape Tomatoes",
+    origin: "Nashik, Maharashtra",
+    destination: "FreshKart DC, Pune",
+    quantity: "940 cases",
+    status: "staged",
+    temp: 4.5,
+    humidity: 90,
+    shock: 0.1,
+    doors: 0,
+    validator: "validator-3.geth.poa",
+    block: 18_442_790,
+    updated: "26m ago",
+  },
+];
+
+// ── Shipment routes (map coords are percentages) ─────────────────────────────
+
+export const shipments: Shipment[] = [
+  {
+    id: "SHP-2231",
+    batch: "TG-8492",
+    driver: "R. Patil",
+    truck: "Reefer · TRK-118",
+    from: { x: 18, y: 62, label: "Ratnagiri" },
+    to: { x: 34, y: 30, label: "Mumbai" },
+    progress: 62,
+    status: "nominal",
+    eta: "3h 12m",
+    temp: 4.0,
+  },
+  {
+    id: "SHP-2230",
+    batch: "TG-8491",
+    driver: "A. Sharma",
+    truck: "Reefer · TRK-207",
+    from: { x: 58, y: 14, label: "Sopore" },
+    to: { x: 66, y: 33, label: "Delhi" },
+    progress: 48,
+    status: "warning",
+    eta: "5h 40m",
+    temp: 7.8,
+  },
+  {
+    id: "SHP-2228",
+    batch: "TG-8487",
+    driver: "S. Nair",
+    truck: "Reefer · TRK-344",
+    from: { x: 78, y: 78, label: "Karnal" },
+    to: { x: 90, y: 64, label: "Kochi" },
+    progress: 74,
+    status: "nominal",
+    eta: "1h 05m",
+    temp: 21.0,
+  },
+  {
+    id: "SHP-2227",
+    batch: "TG-8484",
+    driver: "M. Reddy",
+    truck: "Reefer · TRK-092",
+    from: { x: 47, y: 27, label: "Hyderabad" },
+    to: { x: 55, y: 35, label: "Vijayawada" },
+    progress: 55,
+    status: "buffering",
+    eta: "2h 20m",
+    temp: 5.4,
+  },
+  {
+    id: "SHP-2225",
+    batch: "TG-8480",
+    driver: "V. Menon",
+    truck: "Reefer · TRK-156",
+    from: { x: 30, y: 74, label: "Kochi" },
+    to: { x: 62, y: 42, label: "Mumbai" },
+    progress: 88,
+    status: "critical",
+    eta: "0h 55m",
+    temp: 6.2,
+  },
+];
+
+// ── Telemetry series ───────────────────────────────────────────────────────
+
+export const telemetry: Record<string, TelemetryPoint[]> = {
+  "TG-8492": [
+    { t: "02:00", temp: 3.8, humidity: 63, shock: 0.2, doors: 0 },
+    { t: "04:00", temp: 3.9, humidity: 64, shock: 0.3, doors: 0 },
+    { t: "06:00", temp: 4.1, humidity: 66, shock: 0.2, doors: 1 },
+    { t: "08:00", temp: 4.0, humidity: 65, shock: 0.1, doors: 0 },
+    { t: "10:00", temp: 3.7, humidity: 62, shock: 0.4, doors: 0 },
+    { t: "12:00", temp: 4.2, humidity: 67, shock: 0.2, doors: 1 },
+    { t: "14:00", temp: 3.9, humidity: 64, shock: 0.6, doors: 0 },
+    { t: "16:00", temp: 4.0, humidity: 65, shock: 0.3, doors: 0 },
+  ],
+  "TG-8491": [
+    { t: "02:00", temp: 3.6, humidity: 66, shock: 0.3, doors: 0 },
+    { t: "04:00", temp: 3.8, humidity: 67, shock: 0.2, doors: 0 },
+    { t: "06:00", temp: 4.4, humidity: 69, shock: 0.8, doors: 1 },
+    { t: "08:00", temp: 5.6, humidity: 70, shock: 1.6, doors: 1 },
+    { t: "10:00", temp: 6.4, humidity: 68, shock: 1.1, doors: 2 },
+    { t: "12:00", temp: 7.8, humidity: 71, shock: 3.4, doors: 1 },
+    { t: "14:00", temp: 7.2, humidity: 70, shock: 1.9, doors: 0 },
+    { t: "16:00", temp: 7.8, humidity: 71, shock: 2.6, doors: 0 },
+  ],
+  "TG-8487": [
+    { t: "02:00", temp: 21.2, humidity: 42, shock: 0.1, doors: 0 },
+    { t: "04:00", temp: 20.8, humidity: 43, shock: 0.2, doors: 0 },
+    { t: "06:00", temp: 21.4, humidity: 44, shock: 0.1, doors: 1 },
+    { t: "08:00", temp: 20.9, humidity: 45, shock: 0.2, doors: 0 },
+    { t: "10:00", temp: 21.0, humidity: 44, shock: 0.3, doors: 0 },
+    { t: "12:00", temp: 21.1, humidity: 43, shock: 0.2, doors: 0 },
+    { t: "14:00", temp: 20.7, humidity: 45, shock: 0.1, doors: 0 },
+    { t: "16:00", temp: 21.0, humidity: 44, shock: 0.2, doors: 0 },
+  ],
+  "TG-8484": [
+    { t: "02:00", temp: 5.1, humidity: 46, shock: 0.2, doors: 0 },
+    { t: "04:00", temp: 5.3, humidity: 47, shock: 0.1, doors: 0 },
+    { t: "06:00", temp: 5.0, humidity: 45, shock: 0.2, doors: 0 },
+    { t: "08:00", temp: 5.6, humidity: 49, shock: 0.4, doors: 0 },
+    { t: "10:00", temp: 5.2, humidity: 47, shock: 0.9, doors: 0 },
+    { t: "12:00", temp: 5.5, humidity: 48, shock: 0.3, doors: 0 },
+    { t: "14:00", temp: 5.4, humidity: 48, shock: 0.5, doors: 0 },
+    { t: "16:00", temp: 5.4, humidity: 48, shock: 0.2, doors: 0 },
+  ],
+  "TG-8480": [
+    { t: "02:00", temp: 3.4, humidity: 72, shock: 0.4, doors: 0 },
+    { t: "04:00", temp: 3.9, humidity: 74, shock: 0.3, doors: 1 },
+    { t: "06:00", temp: 4.6, humidity: 75, shock: 0.9, doors: 1 },
+    { t: "08:00", temp: 5.1, humidity: 77, shock: 1.2, doors: 1 },
+    { t: "10:00", temp: 5.8, humidity: 78, shock: 1.5, doors: 1 },
+    { t: "12:00", temp: 6.2, humidity: 78, shock: 2.1, doors: 0 },
+    { t: "14:00", temp: 6.0, humidity: 77, shock: 1.4, doors: 0 },
+    { t: "16:00", temp: 6.2, humidity: 78, shock: 1.8, doors: 0 },
+  ],
+  "TG-8479": [
+    { t: "02:00", temp: 4.0, humidity: 58, shock: 0.2, doors: 2 },
+    { t: "04:00", temp: 4.1, humidity: 59, shock: 0.2, doors: 1 },
+    { t: "06:00", temp: 3.9, humidity: 57, shock: 0.1, doors: 2 },
+    { t: "08:00", temp: 4.0, humidity: 60, shock: 0.2, doors: 2 },
+    { t: "10:00", temp: 4.2, humidity: 61, shock: 0.3, doors: 2 },
+    { t: "12:00", temp: 3.8, humidity: 59, shock: 0.2, doors: 2 },
+    { t: "14:00", temp: 4.0, humidity: 60, shock: 0.4, doors: 1 },
+    { t: "16:00", temp: 4.0, humidity: 60, shock: 0.2, doors: 0 },
+  ],
+  "TG-8477": [
+    { t: "02:00", temp: 4.4, humidity: 91, shock: 0.0, doors: 0 },
+    { t: "04:00", temp: 4.5, humidity: 90, shock: 0.1, doors: 0 },
+    { t: "06:00", temp: 4.5, humidity: 89, shock: 0.0, doors: 0 },
+    { t: "08:00", temp: 4.6, humidity: 90, shock: 0.1, doors: 0 },
+    { t: "10:00", temp: 4.4, humidity: 91, shock: 0.0, doors: 0 },
+    { t: "12:00", temp: 4.5, humidity: 90, shock: 0.1, doors: 0 },
+    { t: "14:00", temp: 4.5, humidity: 90, shock: 0.0, doors: 0 },
+    { t: "16:00", temp: 4.5, humidity: 90, shock: 0.1, doors: 0 },
+  ],
+};
+
+// ── Geth PoA ledger feed ─────────────────────────────────────────────────
+
+export const ledgerFeed: LedgerTx[] = [
+  {
+    hash: "0x8f4a9c1e77b2d3e0f5a6c8d9b1e2f3a4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
+    type: "telemetry-anchor",
+    batch: "TG-8492",
+    block: 18_442_907,
+    gas: "0",
+    status: "sealed",
+    time: "+2s",
+    validator: "validator-2.geth.poa",
+  },
+  {
+    hash: "0x3d7b8e2f4a6c1d3e5f7a9b0c2d4e6f8a1b3c5d7e9f0a2b4c6d8e0f1a3b5c7d9e",
+    type: "custody-transfer",
+    batch: "TG-8480",
+    block: 18_442_906,
+    gas: "0",
+    status: "confirmed",
+    time: "+9s",
+    validator: "validator-1.geth.poa",
+  },
+  {
+    hash: "0xa1c3e5d7b9f0a2c4e6d8b0f2a4c6e8d0b2f4a6c8e0d2b4f6a8c0e2d4b6f8a0c2",
+    type: "telemetry-anchor",
+    batch: "TG-8491",
+    block: 18_442_905,
+    gas: "0",
+    status: "sealed",
+    time: "+14s",
+    validator: "validator-1.geth.poa",
+  },
+  {
+    hash: "0x9b0d2f4a6c8e0a1c3e5d7f9b1d3f5a7c9e0b2d4f6a8c0e2d4b6f8a0c2e4d6f8a",
+    type: "qa-certification",
+    batch: "TG-8484",
+    block: 18_442_904,
+    gas: "0",
+    status: "confirmed",
+    time: "+21s",
+    validator: "validator-2.geth.poa",
+  },
+  {
+    hash: "0x5f8a0c2e4b6d8f0a1c3e5d7b9f1a3c5e7d0b2f4a6c8e0d2b4f6a8c0e2d4b6f8a",
+    type: "telemetry-anchor",
+    batch: "TG-8487",
+    block: 18_442_901,
+    gas: "0",
+    status: "sealed",
+    time: "+38s",
+    validator: "validator-3.geth.poa",
+  },
+  {
+    hash: "0xc2e4a6d8f0b2c4e6a8d0f2b4c6e8a0d2f4b6c8a0e2d4f6b8a0c2e4d6f8a0b2c4",
+    type: "node-register",
+    block: 18_442_899,
+    gas: "0",
+    status: "confirmed",
+    time: "+47s",
+    validator: "validator-2.geth.poa",
+  },
+  {
+    hash: "0x6e8a0b2c4d6f8a0c2e4b6d8f0a1c3e5d7b9f1a3c5e7d0b2f4a6c8e0d2b4f6a8",
+    type: "telemetry-anchor",
+    batch: "TG-8480",
+    block: 18_442_897,
+    gas: "0",
+    status: "sealed",
+    time: "+58s",
+    validator: "validator-1.geth.poa",
+  },
+];
+
+// ── Consumer batch history (scan result) ─────────────────────────────────────
+
+export const consumerTimeline: TimelineEvent[] = [
+  {
+    label: "Origin recorded",
+    detail: "Alphonso Mangoes · Block 18,440,201 · Lot #RN-2261 · Harvest certified organic (APEDA)",
+    place: "Ratnagiri Mango Orchards, MH",
+    time: "Sep 12 · 07:42",
+    txHash: "0x71f3a9c2e5d8b0f4a6c8e2d0b4f6a8c0e2d4b6f8a0c2e4d6f8a0c2e4d6b8f0a2",
+    kind: "origin",
+    icon: "farm",
+    verified: true,
+  },
+  {
+    label: "Packing & QA approval",
+    detail: "Pre-cool to 4.0°C · Shelf-life scan · QA release signed by QA-RN-04",
+    place: "Ratnagiri Packhouse 3",
+    time: "Sep 12 · 19:05",
+    txHash: "0x8a2c4e6d8f0b2d4f6a8c0e2b4d6f8a0c2e4d6b8f0a2c4e6d8f0a2c4e6d8f0b2d",
+    kind: "qa",
+    icon: "thermometer",
+    verified: true,
+  },
+  {
+    label: "Custody: freight carrier",
+    detail: "Biometric handoff verified on-device · Driver R. Patil · Reefer TRK-118",
+    place: "NH-66 northbound",
+    time: "Sep 13 · 05:58",
+    txHash: "0x9c2e4d6f8a0c2e4d6b8f0a2c4e6d8f0a2c4e6d8f0a2b4c6d8e0f1a3b5c7d9e2",
+    kind: "handoff",
+    icon: "truck",
+    verified: true,
+  },
+  {
+    label: "Cold-chain continuous",
+    detail: "1,904 telemetry anchors · Avg 4.1°C · 0 excursions · 3 door events",
+    place: "Edge node TG-N-2231",
+    time: "Sep 13–15",
+    txHash: "0xb4d6f8a0c2e4d6b8f0a2c4e6d8f0a2c4e6d8f0a2c4e6d8f0a2c4e6d8f0a2c4e6",
+    kind: "transport",
+    icon: "truck",
+    verified: true,
+  },
+  {
+    label: "Arrived distribution center",
+    detail: "Dock 12 intake · Cross-dock scan passed · Custody → FreshKart Retail",
+    place: "FreshKart DC, Mumbai",
+    time: "Sep 15 · 11:20",
+    txHash: "0xc4e6d8f0a2c4e6d8f0a2c4e6d8f0a2c4e6d8f0a2b4c6d8e0f1a3b5c7d9e0f1a3",
+    kind: "handoff",
+    icon: "store",
+    verified: true,
+  },
+];
+
+// ── Alerts (admin ticker + transporter popups) ───────────────────────────────
+
+export const alerts: AlertEvent[] = [
+  {
+    id: "AL-0091",
+    batch: "TG-8480",
+    severity: "critical",
+    message: "Reefer unit underperforming — ambient offset 2.4°C",
+    metric: "6.2°C · threshold 5.0°C",
+    time: "3m ago",
+  },
+  {
+    id: "AL-0089",
+    batch: "TG-8491",
+    severity: "warning",
+    message: "Shock event 3.4g detected on rear pallet row",
+    metric: "3.4g · threshold 2.5g",
+    time: "11m ago",
+  },
+  {
+    id: "AL-0087",
+    batch: "TG-8484",
+    severity: "warning",
+    message: "Edge node buffering — 14 records queued (cellular drop)",
+    metric: "14 pending anchors",
+    time: "16m ago",
+  },
+];
+
+export const statusLabel: Record<BatchStatus, string> = {
+  "in-transit": "In transit",
+  "at-risk": "At risk",
+  delivered: "Delivered",
+  staged: "Staged",
+};
+
+export const fmtTemp = (t: number) => `${t.toFixed(1)}°C`;
